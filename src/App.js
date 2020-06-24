@@ -1,24 +1,71 @@
-import React from 'react';
-import logo from './logo.svg';
+import React, { useState } from 'react';
 import './App.css';
+import fb from './services/firebase'
+import { useEffect } from 'react';
+import moment from 'moment'
 
 function App() {
+  const [tasks, setTasks] = useState([])
+  const [newTaskName, setNewTaskName] = useState('')
+  
+  useEffect(() => {
+    const unsubscribe = fb.firestore().collection('tasks').orderBy('createdAt', 'desc').onSnapshot(s => {
+      setTasks(s.docs.map(task => {
+        return {id: task.id, ...task.data()}
+      }))
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    fb.firestore().collection('tasks').add({
+      name: newTaskName,
+      done: true,
+      createdAt: fb.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+      setNewTaskName('')
+    })
+  }
+
+  const toggleTask = (t) => {
+    fb.firestore().collection('tasks').doc(t.id).update({
+      done: !t.done
+    })
+  }
+
+  const deleteTask = (t) => {
+    fb.firestore().collection('tasks').doc(t.id).delete().then(() => {
+      console.log('task deleted')
+    }).catch((err) => {
+      console.error('an error has occured while deleting this task', err)
+    })
+  }
+  
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <form onSubmit={handleSubmit}>
+        <input type="text" placeholder="new task name" onChange={e => setNewTaskName(e.target.value)} value={newTaskName} />
+      </form>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Done</th>
+            <th>Creation date</th>
+            <th>Delete</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map(t => <tr key={t.id}>
+            <td>{t.name}</td>  
+            <td><input type="checkbox" checked={t.done} onChange={() => toggleTask(t)} /></td>  
+            <td>{t.createdAt && moment.unix(t.createdAt.seconds).format('DD/MM/YYYY HH:mm:ss')}</td>  
+            <td><button onClick={() => deleteTask(t)} >Delete</button></td>  
+          </tr>)}
+        </tbody>
+      </table>
     </div>
   );
 }
