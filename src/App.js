@@ -1,12 +1,27 @@
 import React, { useState } from 'react';
 import './App.css';
-import fb from './services/firebase'
+import {firebase, messaging} from './services/firebase'
 import { useEffect } from 'react';
 import moment from 'moment'
+const fb = firebase;
+
+messaging.onMessage((payload) => console.log('Message received. ', payload));
 
 function App() {
   const [tasks, setTasks] = useState([])
   const [newTaskName, setNewTaskName] = useState('')
+
+  useEffect(() => {
+    messaging.requestPermission()
+    .then(async function() {
+      const token = await messaging.getToken();
+      console.log(token)
+    })
+    .catch(function(err) {
+      console.log("Unable to get permission to notify.", err);
+    });
+    navigator.serviceWorker.addEventListener("message", (message) => console.log(message));
+  }, [])
   
   useEffect(() => {
     const unsubscribe = fb.firestore().collection('tasks').orderBy('createdAt', 'desc').onSnapshot(s => {
